@@ -1,36 +1,29 @@
-# Generate Flow
+# 课堂生成流程
 
-## Preconditions
+## 前置条件
 
-- Repo path is confirmed
-- Startup mode has been chosen
-- OpenMAIC is healthy at the selected `url`
-- Provider keys are configured
+- ✅ 仓库路径已确认
+- ✅ 启动模式已选择
+- ✅ 服务健康（`GET {url}/api/health` 返回正常）
+- ✅ Provider Keys 已配置
 
-> **Hosted mode**: If using hosted OpenMAIC (open.maic.chat), all
-> preconditions (repo, startup, provider keys) are already satisfied.
-> Include `Authorization: Bearer <access-code>` header on all requests below.
-> See [hosted-mode.md](hosted-mode.md) for details.
+> **托管模式**：使用 open.maic.chat 时，以上条件自动满足，所有请求需加 `Authorization: Bearer <access-code>` 头
 
-## Requirement-Only Generation
+## 仅文本生成
 
-If the user has already clearly asked to generate the classroom and the preconditions are satisfied, submit the generation job immediately. Do not ask for a second confirmation just before calling `/api/generate-classroom`.
-
-Submit the job with:
+用户明确要求生成 + 前置条件满足 → 直接提交，无需二次确认
 
 ```text
 POST {url}/api/generate-classroom
 ```
 
-Request body:
-
 ```json
 {
-  "requirement": "Create an introductory classroom on quantum mechanics for high school students"
+  "requirement": "创建一个高中量子力学入门课堂"
 }
 ```
 
-Only send supported content fields:
+### 支持的字段
 
 - `requirement` (required)
 - optional `pdfContent`
@@ -43,16 +36,12 @@ Only send supported content fields:
   - `"default"` (or omitted): uses built-in default agents
   - `"generate"`: uses LLM to generate custom agent profiles tailored to the course content
 
-All optional boolean fields default to `false` when omitted. Omitting them preserves backward compatibility.
+### 特性检测
 
-### Feature Detection
-
-Before sending optional feature flags, query `GET {url}/api/health` and check the `capabilities` object:
+发送可选特性前，先查 `GET {url}/api/health` 的 `capabilities` 字段：
 
 ```json
 {
-  "status": "ok",
-  "version": "...",
   "capabilities": {
     "webSearch": true,
     "imageGeneration": false,
@@ -62,109 +51,55 @@ Before sending optional feature flags, query `GET {url}/api/health` and check th
 }
 ```
 
-Only set a feature flag to `true` if the corresponding capability is `true`. If the server does not return `capabilities` (older version), do not send the new fields.
+只有当 `capabilities` 为 `true` 时才发送对应的 `enableXxx: true`
 
-Do not rely on request-time model or provider override parameters.
-
-Treat the `POST` response as job submission only. Expect fields such as:
+## 响应处理
 
 ```json
 {
   "success": true,
   "jobId": "abc123",
   "status": "queued",
-  "step": "queued",
   "pollUrl": "http://localhost:3000/api/generate-classroom/abc123",
   "pollIntervalMs": 5000
 }
 ```
 
-## PDF-Based Generation
+保存 `jobId`、`pollUrl`、`pollIntervalMs`，进入轮询
 
-1. Resolve the absolute path to the PDF.
-2. Confirm before reading the file.
-3. Parse the PDF first:
+## PDF生成
 
-```text
-POST {url}/api/parse-pdf
+1. 确认后再读取本地PDF
+2. 先解析PDF：`POST {url}/api/parse-pdf`
+3. 带 `requirement` + `pdfContent` 提交：`POST {url}/api/generate-classroom`
+
+## 轮询流程
+
+1. 每60秒轮询一次（不要频繁刷）
+2. `queued` / `running` = 进行中，继续等
+3. `succeeded` → 返回课堂ID和URL
+4. `failed` → 返回错误信息，提示用户检查配置
+
+### 可靠性规则
+
+- ❌ 不要因为一次轮询失败就重启Job
+- ❌ 不要尝试用请求参数修复认证/Provider错误
+- ✅ 单次Agent轮询最多轮询约10分钟
+- ✅ Job还在运行时结束轮询，告知用户Job ID让其稍后继续
+
+### 超时处理
+
+> "课堂生成仍在后台运行，Job ID: abc123，稍后可以回来继续查询进度。"
+
+## 返回格式
+
+成功时：
 ```
-
-4. Then send `requirement` plus `pdfContent` to:
-
-```text
-POST {url}/api/generate-classroom
-```
-
-## Polling Loop
-
-After the job is submitted:
-
-1. Save `jobId`, `pollUrl`, and `pollIntervalMs`.
-2. Do not submit another generation job while this one is still `queued` or `running`.
-3. Poll:
-
-```text
-GET {pollUrl}
-```
-
-4. Prefer a conservative polling cadence of about 60 seconds between polls for classroom generation jobs, even if `pollIntervalMs` is shorter.
-5. Treat `queued` and `running` as in-progress states.
-6. Stop only when `status` becomes `succeeded` or `failed`.
-
-### Reliability Rules
-
-- Never restart the job just because a poll request fails once.
-- If a poll request returns a transient network error or `5xx`, wait about 60 seconds and retry the same `pollUrl`.
-- If the job is still running after many polls, tell the user it is still in progress and continue polling instead of resubmitting.
-- Prefer fewer poll attempts over aggressive polling. Long-running jobs are more likely to survive agent-loop limits if the tool-call cadence stays low.
-- Within a single agent turn, cap active polling to about 10 minutes. If the job is still not finished, tell the user it is still running and include the `jobId` and `pollUrl` so a later turn can continue checking without resubmitting.
-- Report progress to the user only when `status`, `step`, or visible progress meaningfully changes. Do not spam every poll result.
-- Do not try to recover from auth, provider, model, or base URL errors by changing request parameters. Tell the user to fix OpenMAIC server-side config and retry only after they confirm.
-- On `failed`, surface the server error and include the `jobId`.
-- On `succeeded`, use `result.classroomId` and `result.url` from the final poll response.
-
-## If The Loop Ends First
-
-If the job is still running when you stop active polling for this turn, tell the user that the classroom generation is still running in the background and invite them to come back a little later to continue checking the same job.
-
-Use natural phrasing such as:
-
-```text
-The classroom generation is still running in the background.
-Job ID: abc123
-
-Check back with me in a little while and I can continue tracking this same job without starting over.
-```
-
-## What To Return
-
-Return the generated classroom ID plus a directly clickable classroom URL.
-
-Output the URL as a raw absolute URL on its own line.
-
-Do not wrap the URL in:
-
-- bold markers such as `**...**`
-- markdown links such as `[title](url)`
-- code formatting such as `` `...` ``
-- angle brackets such as `<...>`
-- markdown tables
-
-Use a compact format like:
-
-```text
 Classroom ID: Uyh82Y32ZK
 Classroom URL:
 http://localhost:3001/classroom/Uyh82Y32ZK
 ```
 
-If the job fails, return the job ID plus the server error.
+❌ 不要加粗/链接/代码格式，直接给原始URL
 
-If generation fails, surface the server error directly instead of paraphrasing it away.
-
-If the error suggests a provider or model configuration problem, explicitly tell the user to update `.env.local` or `server-providers.yml` instead of attempting a runtime override.
-
-## Confirmation Requirements
-
-- Ask before reading a local PDF.
-- Do not ask for a second confirmation before the generation request if the user has already clearly asked you to generate the classroom.
+失败时：返回Job ID + 服务器错误，如果涉及Provider/Model问题，提示用户检查 `.env.local`

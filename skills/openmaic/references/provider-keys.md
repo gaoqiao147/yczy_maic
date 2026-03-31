@@ -1,179 +1,81 @@
-# Provider Keys
+# Provider Keys 配置
 
-## Critical Boundary
+## 重要前提
 
-OpenMAIC generation does not automatically reuse the OpenClaw agent's current model or API key.
+- **不复用OpenClaw的Key** - OpenMAIC使用自己的服务端配置
+- **不碰用户密钥** - 不帮写、不要求在聊天中粘贴
+- **用户自己修改配置文件** - 告诉用户改哪个文件哪个字段
 
-OpenMAIC server APIs resolve their own model and provider keys from OpenMAIC server-side config.
+## 推荐流程
 
-This skill does not rely on runtime overrides for model, provider, API key, base URL, or provider type.
+1. 推荐一个Provider方案
+2. 问用户想在哪里配置：`.env.local`（推荐）或 `server-providers.yml`
+3. 告诉用户具体要改什么
+4. 等用户确认改好了再继续
 
-If the user wants to change any of those, they must edit OpenMAIC server-side config files.
+## 推荐方案
 
-## Interaction Policy
-
-- Do not begin by asking the user to paste an API key into chat.
-- First, recommend a provider path.
-- Then ask how the user wants to configure it.
-- The user should edit `.env.local` or `server-providers.yml` themselves.
-- Do not offer to write the key for them.
-- Do not ask for the literal key in chat.
-- Do not suggest temporary request-time overrides.
-- If generation fails because of auth, provider, or model selection, direct the user back to server-side config files.
-
-## Preferred User Flow
-
-1. Recommend a provider option.
-2. Ask where the user wants to configure it:
-   - `.env.local` (recommended for most users)
-   - `server-providers.yml`
-3. Tell the user exactly which variables or YAML fields to edit.
-4. Wait for the user to confirm they finished editing before continuing.
-
-## Recommendation Paths
-
-### 1. Lowest-Friction Setup
-
-Recommended when the user wants the smallest amount of configuration.
-
-Set:
+### 1. 最简单 - Anthropic
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Why:
+一句话：配置最少，直接用
 
-- OpenMAIC server fallback is currently `gpt-4o-mini` if `DEFAULT_MODEL` is unset.
-- If the user wants Anthropic or Google by default, they should set `DEFAULT_MODEL` explicitly.
-
-### 2. Better Speed / Cost Balance
-
-Recommended when the user is willing to set one extra variable.
-
-Set:
+### 2. 性价比之选 - Google
 
 ```env
 GOOGLE_API_KEY=...
 DEFAULT_MODEL=google:gemini-3-flash-preview
 ```
 
-Why:
+一句话：速度快、成本低，**记得加`google:`前缀**，否则会默认解析为OpenAI模型
 
-- Good quality-to-speed balance
-- Matches the repo's current recommendation direction better than the default fallback
-- The `google:` prefix is important. Without a provider prefix, model parsing defaults to OpenAI.
-
-### 3. Existing Provider Reuse
-
-Use when the user already has OpenAI or another supported provider configured and wants to stick with it.
-
-Examples:
+### 3. 已有Provider - 复用
 
 ```env
 OPENAI_API_KEY=sk-...
 DEFAULT_MODEL=openai:gpt-4o-mini
 ```
 
+或
+
 ```env
 DEEPSEEK_API_KEY=...
 DEFAULT_MODEL=deepseek:deepseek-chat
 ```
 
-## Model String Rule
+## 配置方法
 
-When recommending or showing `DEFAULT_MODEL`, always include the provider prefix:
+推荐用 `.env.local`（复制自 `.env.example`）
 
-- `google:gemini-3-flash-preview`
-- `anthropic:claude-3-5-haiku-20241022`
-- `openai:gpt-4o-mini`
-- `deepseek:deepseek-chat`
+## 建议话术
 
-Do not recommend bare model IDs such as `gemini-3-flash-preview` by themselves, because OpenMAIC will otherwise parse them as OpenAI models.
+✅ 可以说：
+- "推荐通过 `.env.local` 配置，编辑完成后告诉我"
+- "简单设置选Anthropic，追求性价比选Google+`DEFAULT_MODEL=google:gemini-3-flash-preview`，你想哪个？"
 
-Do not work around a wrong `DEFAULT_MODEL` by changing request parameters. The user should fix the server-side config instead.
+❌ 避免：
+- "把API Key发给我"
+- "把Key粘贴到这里"
+- "我帮你写进去"
 
-## Preferred Config Method
+## 确认要求
 
-For first setup, prefer `.env.local`:
+- 先推荐一个方案
+- 问用户选哪个配置文件
+- 等用户确认改好了再继续
 
-```bash
-cp .env.example .env.local
-```
+## Optional Features 可选功能
 
-Then fill the chosen keys.
+核心LLM配置完成后询问用户是否启用：
 
-Alternative: `server-providers.yml`
+| 功能 | 环境变量 | 说明 |
+|------|----------|------|
+| Web搜索 | `TAVILY_API_KEY` | 实时网络研究增强大纲 |
+| 图片生成 | `IMAGE_SEEDREAM_API_KEY` 或 `IMAGE_QWEN_IMAGE_API_KEY` | 为幻灯片生成图片 |
+| 视频生成 | `VIDEO_SEEDANCE_API_KEY` 或 `VIDEO_KLING_API_KEY` | 生成短视频 |
+| TTS语音 | `TTS_OPENAI_API_KEY` 或 `TTS_AZURE_API_KEY` | 文本转语音旁白 |
 
-```yaml
-providers:
-  anthropic:
-    apiKey: sk-ant-...
-
-  google:
-    apiKey: ...
-
-  openai:
-    apiKey: sk-...
-```
-
-If using a non-default provider for classroom generation, also set the model selection explicitly:
-
-```env
-DEFAULT_MODEL=google:gemini-3-flash-preview
-```
-
-## Recommended Prompts To The User
-
-Preferred:
-
-- "I recommend configuring OpenMAIC through `.env.local` first. Please edit that file locally and tell me when you're done."
-- "For the simplest setup, I recommend Anthropic. For better speed/cost balance, I recommend Google plus `DEFAULT_MODEL=google:gemini-3-flash-preview`. Which path do you want?"
-
-Avoid as the first move:
-
-- "Send me your API key"
-- "Paste your API key here"
-- "Do you want me to write the key for you?"
-
-## Confirmation Requirements
-
-- Recommend one provider path first.
-- Ask the user which config-file path they want.
-- Instruct the user to modify the file themselves.
-- Wait for the user to confirm they finished editing before continuing.
-- Do not request the literal key.
-- If provider/model/auth errors happen later, tell the user exactly which config entry to fix and wait for confirmation before retrying.
-
-## Optional Features
-
-These features require additional provider keys beyond the core LLM provider. Ask the user if they want to enable any of these after the core LLM key is configured.
-
-| Feature | Env Variable(s) | Description |
-|---------|-----------------|-------------|
-| Web Search | `TAVILY_API_KEY` | Enriches outlines with real-time web research |
-| Image Generation | `IMAGE_SEEDREAM_API_KEY`, `IMAGE_QWEN_IMAGE_API_KEY`, `IMAGE_NANO_BANANA_API_KEY` | Generates images for slides (any one suffices) |
-| Video Generation | `VIDEO_SEEDANCE_API_KEY`, `VIDEO_KLING_API_KEY`, `VIDEO_VEO_API_KEY`, `VIDEO_SORA_API_KEY` | Generates short videos (any one suffices) |
-| TTS | `TTS_OPENAI_API_KEY`, `TTS_AZURE_API_KEY`, `TTS_GLM_API_KEY`, `TTS_QWEN_API_KEY` | Text-to-speech narration (any one suffices) |
-
-These are all optional. The classroom generation works without them — they only unlock richer content.
-
-Alternatively, configure via `server-providers.yml`:
-
-```yaml
-web-search:
-  tavily:
-    apiKey: tvly-...
-
-image:
-  seedream:
-    apiKey: ...
-
-video:
-  seedance:
-    apiKey: ...
-
-tts:
-  openai-tts:
-    apiKey: sk-...
-```
+> 全部可选，不影响课堂生成基本功能

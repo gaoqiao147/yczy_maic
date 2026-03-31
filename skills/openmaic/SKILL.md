@@ -9,94 +9,67 @@ metadata: { "openclaw": { "emoji": "🏫" } }
 
 Use this as a guided, confirmation-heavy SOP. Do not compress the whole setup into one reply and do not perform state-changing actions without explicit user confirmation.
 
-## Core Rules
+## 核心原则
 
-- Move one phase at a time.
-- Before any state-changing action, ask for confirmation.
-- If local state already exists, show what you found and ask whether to keep it.
-- Do not assume the OpenClaw agent's own model or API key will be reused by OpenMAIC.
-- OpenMAIC classroom generation uses OpenMAIC server-side provider config.
-- This skill must not rely on any request-time model or provider overrides.
-- Only OpenMAIC server-side config files may control provider selection and defaults.
-- Do not default to asking the user to paste API keys into chat.
-- Prefer guiding the user to edit local config files themselves.
-- Do not offer to write API keys into config files on the user's behalf.
-- Once setup is complete and the user clearly asks to generate a classroom, do not ask for a second confirmation before submitting the generation job.
-- Keep confirmations for local file reads such as reading a PDF from disk.
+- **一步一步来**：每个阶段完成后，再进入下一阶段
+- **先确认再行动**：任何状态变更前必须得到用户确认
+- **不碰用户密钥**：不帮用户写API Key，不要求用户在聊天中粘贴Key
+- **复用现有资源**：如果仓库已存在，询问是否复用而不是直接克隆
 
-## Optional Skill Config
+## 技能配置（可选）
 
-If present, read defaults from `~/.openclaw/openclaw.json` under:
+如配置了以下选项，会作为默认值：
 
-```jsonc
-{
-  "skills": {
-    "entries": {
-      "openmaic": {
-        "enabled": true,
-        "config": {
-          "accessCode": "sk-xxx",
-          "repoDir": "/path/to/OpenMAIC",
-          "url": "http://localhost:3000"
-        }
-      }
-    }
-  }
-}
-```
+- `accessCode`：存在时默认用托管模式，直接跳过模式选择
+- `repoDir`：本地模式时的默认仓库路径
+- `url`：本地模式时的默认服务地址
 
-- If `accessCode` is present, default to hosted mode and skip the mode-selection prompt.
-- Use `repoDir` and `url` only as defaults for local mode.
-- Still confirm before acting.
+> 即使有配置，仍然需要确认后再执行
 
 ## SOP Phases
 
-### 0. Choose Mode
+### 0. 选择模式
 
-First check skill config for `accessCode`. If present, announce that a stored access code was found and proceed directly to hosted mode (load [references/hosted-mode.md](references/hosted-mode.md), skip phases 1–4). Do not ask the user to paste the code again.
+检查技能配置是否有 `accessCode`：
+- **有** → 直接进入托管模式，跳过阶段1-4
+- **没有** → 询问用户：
+  1. **托管模式**（推荐）- 需要access code，无需本地配置
+  2. **本地运行** - 克隆仓库、配置Key、启动服务
 
-If no `accessCode` in config, ask the user how they want to use OpenMAIC:
+### 1. 克隆或复用仓库
 
-1. **Use hosted OpenMAIC** (recommended for quick start) — Requires an access code from open.maic.chat. No local setup needed.
-2. **Run locally** — Clone the repo, configure provider keys, and run on your machine.
+查看 [clone.md](references/clone.md)
 
-If the user chooses hosted mode, load [references/hosted-mode.md](references/hosted-mode.md) and skip phases 1–4.
-If the user chooses local mode, proceed to phase 1 as usual.
+用户未安装过，或需要确认使用哪个本地仓库时使用。
 
-### 1. Clone Or Reuse Existing Repo
+### 2. 选择启动模式
 
-Load [references/clone.md](references/clone.md).
+查看 [startup-modes.md](references/startup-modes.md)
 
-Use this when the user has not installed OpenMAIC yet or when you need to confirm which local checkout to use.
+仓库确认后，列出可用模式，推荐一个并等待用户选择。
 
-### 2. Choose Startup Mode
+### 3. 配置Provider Keys
 
-Load [references/startup-modes.md](references/startup-modes.md).
+查看 [provider-keys.md](references/provider-keys.md)
 
-Use this after the repo location is confirmed. Present the available startup modes, recommend one, and wait for the user's choice.
+生成课堂前必须完成。推荐Provider路径，告诉用户具体要修改哪个配置文件。
 
-### 3. Configure Provider Keys
+核心LLM配置完成后，询问是否启用可选功能（Web搜索/图片/视频/TTS）。
 
-Load [references/provider-keys.md](references/provider-keys.md).
+### 4. 启动并验证
 
-Use this before starting classroom generation. Recommend a provider path and tell the user exactly which config file to edit themselves. If generation later fails due to provider/model/auth issues, return to this phase and direct the user to update the same server-side config files.
+选择启动模式 + 配置Key完成后，启动服务并验证健康状态：`GET {url}/api/health`
 
-After the core LLM key is configured, ask the user if they want to enable optional features (web search, image generation, video generation, TTS). Each requires its own provider key — see the "Optional Features" section in provider-keys.md.
+### 5. 生成课堂
 
-### 4. Start And Verify OpenMAIC
+查看 [generate-flow.md](references/generate-flow.md)
 
-After the user has chosen a startup mode and configured keys, start OpenMAIC using the chosen method, then verify the service with `GET {url}/api/health`.
+仅在服务健康时使用。用户明确要求生成时，直接提交Job无需二次确认。
 
-### 5. Generate A Classroom
+## 回复风格
 
-Load [references/generate-flow.md](references/generate-flow.md).
-
-Use this only after the service is healthy. Confirm before reading local PDFs. If the user has already clearly asked to generate, do not ask for a second confirmation before submitting the generation job, and then follow the polling loop until it succeeds or fails. Only send the supported content fields for generation requests. For long-running jobs, prefer sparse polling and tell the user to check back later if the turn ends before completion.
-
-## Response Style
-
-- Keep each step short and explicit.
-- Prefer 2-3 concrete options when the user must choose.
-- Always include the recommended option first and explain why in one sentence.
-- After a step completes, say what changed and what the next confirmation is for.
-- When returning a classroom link, place the raw absolute URL on its own line with no bold, markdown link syntax, code formatting, or tables.
+- **简洁明确**：每个步骤短小清晰
+- **给出选项**：让用户做选择时，提供2-3个具体选项，第一项是推荐的
+- **说明原因**：推荐时用一句话解释为什么
+- **告知下一步**：完成后说明改变了什么，下一步确认什么
+- **返回URL**：课堂链接直接给原始URL，不要加粗/链接/代码格式

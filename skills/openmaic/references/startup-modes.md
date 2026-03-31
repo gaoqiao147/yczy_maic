@@ -1,69 +1,46 @@
-# Startup Modes
+# 启动模式
 
-## Goal
+## 选项
 
-Help the user choose how OpenMAIC should run before you start anything.
-
-## Options
-
-### 1. Development Mode
-
-Recommended for first-time setup and debugging.
+### 1. 开发模式（推荐）
 
 ```bash
 pnpm dev
 ```
+- ✅ 反馈最快，适合首次配置和调试
+- ❌ 不代表生产环境
 
-Tradeoff:
-
-- Fastest feedback loop
-- Best for validating config changes
-- Not representative of production startup
-
-### 2. Production-Like Local Mode
-
-Recommended when the user wants behavior closer to a deployed server.
+### 2. 生产模式
 
 ```bash
 pnpm build && pnpm start
 ```
+- ✅ 更接近线上环境
+- ❌ 启动较慢
 
-Tradeoff:
-
-- Closer to production
-- Slower startup than `pnpm dev`
-
-### 3. Docker Compose
-
-Use only when the user explicitly wants containerized startup or wants to avoid local Node setup details.
+### 3. Docker
 
 ```bash
 docker compose up --build
 ```
+- ✅ 环境隔离
+- ❌ 较重，难快速调试
 
-Tradeoff:
+## 推荐顺序
 
-- Cleaner isolation
-- Heavier and slower
-- Harder to debug application-level issues quickly
-
-## Recommendation Order
-
-1. `pnpm dev`
+1. `pnpm dev` ← 首选
 2. `pnpm build && pnpm start`
 3. `docker compose up --build`
 
-## Health Check
+## 健康检查
 
-After startup, verify:
-
+启动后验证：
 ```bash
 curl -fsS http://localhost:3000/api/health
 ```
+（技能配置了自定义url则用那个）
 
-If the skill config provides a custom `url`, use that instead.
+## 确认要求
 
-## Confirmation Requirements
-
-- Ask the user to choose one startup mode.
-- Ask again before running the selected command.
+- 让用户选一个模式
+- 选完再执行

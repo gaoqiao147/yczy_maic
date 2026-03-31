@@ -1,42 +1,43 @@
-# Hosted Mode
+# 托管模式
 
-Use this when the user has an access code from open.maic.chat and wants to skip local setup.
+当用户有 open.maic.chat 的 access code 时使用。
 
-## Access Code Setup
+## Access Code 配置
 
-1. Read `accessCode` from skill config (`~/.openclaw/openclaw.json` → `skills.entries.openmaic.config.accessCode`).
-2. If found, use it directly. Do not ask the user to paste the code into chat.
-3. If not found, tell the user to add their access code to the config file:
+1. 读取技能配置中的 `accessCode`
+2. 有 → 直接用，不让用户粘贴
+3. 没有 → 告诉用户去 `~/.openclaw/openclaw.json` 添加：
    ```
-   Edit ~/.openclaw/openclaw.json and set skills.entries.openmaic.config.accessCode to your access code (starts with sk-).
+   skills.entries.openmaic.config.accessCode = "sk-xxx"
    ```
-   Wait for the user to confirm before continuing. Do not ask them to paste the code in chat.
-4. Verify connectivity: `GET https://open.maic.chat/api/health` with `Authorization: Bearer <access-code>`
-   - On success: confirm connection and proceed to generation.
-   - On failure (401): access code is invalid, ask the user to check or regenerate at open.maic.chat and update the config file.
-   - On failure (network): suggest checking network or trying local mode.
+   确认后再继续
 
-## Generating a Classroom
+4. 验证连接：`GET https://open.maic.chat/api/health` + `Authorization: Bearer <access-code>`
+   - ✅ 成功 → 确认连接，进入生成
+   - 401 → code无效，让用户去 open.maic.chat 重新生成
+   - 网络错误 → 检查网络或切换本地模式
 
-Follow the same generation flow as [generate-flow.md](generate-flow.md) with these differences:
+## 生成课堂
 
-- **Base URL**: `https://open.maic.chat` (hardcoded, not configurable)
-- **Authorization**: Include header `Authorization: Bearer <access-code>` on all API requests
-- **Classroom URL**: `https://open.maic.chat/classroom/{id}`
+同 generate-flow.md，但：
 
-### Feature Detection in Hosted Mode
+- **Base URL**: `https://open.maic.chat`
+- **每请求加认证头**: `Authorization: Bearer <access-code>`
+- **课堂URL**: `https://open.maic.chat/classroom/{id}`
 
-Before generating, query `GET https://open.maic.chat/api/health` (with auth header) to check `capabilities`. Automatically include optional feature flags (`enableWebSearch`, `enableImageGeneration`, etc.) based on what the server supports. Do not send new fields if the server does not return `capabilities` (older version). This ensures forward compatibility — the hosted instance may update on a different schedule than the local codebase.
+## 特性检测
 
-## Quota
+生成前查询 `GET https://open.maic.chat/api/health`（带认证头）的 `capabilities`，自动决定是否启用可选特性
 
-- 10 generations per day, independent of web UI quota
-- If generation returns 403 with `Daily quota exhausted`, inform the user of the daily limit and that it resets at midnight.
+## 限额
 
-## Error Handling
+- 每天10次生成（独立于Web UI）
+- 403 `Daily quota exhausted` → 告知限额，次日0点重置
 
-| HTTP Status | Meaning | Action |
-|-------------|---------|--------|
-| 401 | Invalid access code | Ask user to check their code or generate a new one at open.maic.chat |
-| 403 | Quota exhausted | Inform daily limit (10), suggest trying tomorrow |
-| 500 | Server error | Suggest retrying later or switching to local mode |
+## 错误处理
+
+| 状态码 | 含义 | 处理 |
+|--------|------|------|
+| 401 | Access code无效 | 让用户检查或重新生成 |
+| 403 | 限额用完 | 告知每天10次，明天再来 |
+| 500 | 服务器错误 | 重试或换本地模式 |

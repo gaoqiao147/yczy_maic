@@ -1,38 +1,30 @@
-# Clone Or Reuse Existing Repo
+# 克隆或复用仓库
 
-## Goal
+## 流程
 
-Establish which OpenMAIC checkout will be used for setup and runtime actions.
+1. 检查本地是否已有OpenMAIC
+2. 有 → 展示路径，询问是否复用
+3. 没有 → 建议克隆，询问确认
+4. 克隆后单独确认安装依赖
 
-## Procedure
+## 推荐
 
-1. Check whether OpenMAIC already exists locally.
-2. If a checkout exists, show the path and ask whether to reuse it.
-3. If no checkout exists, propose cloning the repo and ask for confirmation.
-4. After clone, confirm dependency installation separately.
+- ✅ 优先复用已有仓库（如果是目标分支）
+- ❌ 不要直接覆盖脏的仓库
 
-## Recommended Path
-
-- Recommended: reuse an existing checkout if it is already on the target branch.
-- Otherwise: clone a fresh checkout from GitHub, then install dependencies.
-
-## Commands
-
-Clone:
+## 命令
 
 ```bash
+# 克隆
 git clone https://github.com/THU-MAIC/OpenMAIC.git
 cd OpenMAIC
-```
 
-Install dependencies:
-
-```bash
+# 安装依赖
 pnpm install
 ```
 
-## Confirmation Requirements
+## 确认要求
 
-- Ask before `git clone`.
-- Ask before `pnpm install`.
-- If the repo is dirty, tell the user and ask whether to continue with that checkout.
+- 克隆前确认
+- 安装依赖前确认
+- 仓库有未提交更改时告知用户
